@@ -42,7 +42,8 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS roles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE
+            name TEXT UNIQUE,
+            status integer DEFAULT 1
         )
     """)
 
@@ -50,7 +51,8 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS permissions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE
+            name TEXT UNIQUE,
+            status integer DEFAULT 1
         )
     """)
 
@@ -190,7 +192,7 @@ def permission_required(permission_name):
             perm = cursor.fetchone()
             conn.close()
             if not perm:
-                return jsonify({'error': f'Permiso "{permission_name}" requerido'}), 403
+                return jsonify({'error': f'No Autorizado!! Permiso "{permission_name}" requerido'}), 403
             return f(*args, **kwargs)
         return decorated
     return decorator
@@ -404,7 +406,7 @@ def delete_user(user_id):
 def get_roles():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM roles")
+    cursor.execute("SELECT id, name FROM roles WHERE status = 1")
     roles = cursor.fetchall()
     conn.close()
     roles_list = [dict(role) for role in roles]
@@ -460,14 +462,16 @@ def update_role(role_id):
 def delete_role(role_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM roles WHERE id = ?", (role_id,))
+    cursor.execute(
+        "UPDATE roles SET status = 0 WHERE id = ? AND status = 1", (role_id,))
     conn.commit()
-    affected = conn.total_changes
+    affected_rows = conn.total_changes
     conn.close()
-    if affected > 0:
-        return jsonify({"message": "Rol eliminado exitosamente"})
+
+    if affected_rows > 0:
+        return jsonify({"message": "Rol desactivado exitosamente"})
     else:
-        return jsonify({"error": "Rol no encontrado"}), 404
+        return jsonify({"error": "Rol no encontrado o ya inactivo"}), 404
 
 # -- Gestión permisos --
 
@@ -478,7 +482,7 @@ def delete_role(role_id):
 def get_permissions():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM permissions")
+    cursor.execute("SELECT id, name FROM permissions WHERE status = 1")
     permissions = cursor.fetchall()
     conn.close()
     permissions_list = [dict(perm) for perm in permissions]
@@ -504,7 +508,8 @@ def create_permission():
     finally:
         conn.close()
 
-
+@app.route('/permission/<int:permission_id>', methods=['PUT'])
+@token_required
 @permission_required('update_permission')
 def update_permission(permission_id):
     data = request.get_json()
@@ -540,15 +545,16 @@ def delete_permission(permission_id):
 
     # Opcional: verificar que no haya usuarios asignados a este rol antes de eliminar
 
-    cursor.execute("DELETE FROM permissions WHERE id = ?", (permission_id,))
+    cursor.execute(
+    "UPDATE permissions SET status = 0 WHERE id = ? AND status = 1", (permission_id,))
     conn.commit()
     affected_rows = conn.total_changes
     conn.close()
 
     if affected_rows > 0:
-        return jsonify({"message": "permiso eliminado exitosamente"})
+        return jsonify({"message": "Permiso desactivado exitosamente"})
     else:
-        return jsonify({"error": "permiso no encontrado"}), 404
+        return jsonify({"error": "Permiso no encontrado o ya inactivo"}), 404
 
 
 if __name__ == '__main__':

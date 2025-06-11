@@ -1,5 +1,8 @@
 ## Version Python 
-3.12.2
+- 3.12.2
+- Git instalado
+## clone the repository
+git clone https://github.com/morgan24jm/Evaluacion.git
 ## Dependencesto install 
 See requirements.txt
 ## Step to run 
